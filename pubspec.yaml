@@ -33,12 +33,14 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_local_notifications: null
-  flutter_staggered_animations:
+  flutter_staggered_animations: null
   get: null
   get_storage: null
   google_fonts: null
   intl: null
   sqflite: null
+  flutter_timezone: ^1.0.8
+  timezone: ^0.9.2
 
 dev_dependencies:
   flutter_lints: null

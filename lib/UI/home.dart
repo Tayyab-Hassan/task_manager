@@ -1,13 +1,19 @@
+// ignore_for_file: avoid_print
+
+import 'package:date_picker_timeline/date_picker_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:task_manager/Models/task.dart';
 import 'package:task_manager/Services/themes_services.dart';
+import 'package:task_manager/UI/Widgets/button.dart';
 import 'package:task_manager/UI/add_task.dart';
 import 'package:task_manager/UI/theme.dart';
 
 import '../Controllers/task_controller.dart';
-import 'Widgets/appbars.dart';
+import '../Services/notification_services.dart';
 import 'Widgets/task_tile.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -18,33 +24,26 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // ignore: prefer_typing_uninitialized_variables
+  var notifyHlper;
   final TaskController _taskController = Get.put(TaskController());
-  DateTime date = DateTime.now();
+  DateTime selectedDate = DateTime.now();
   @override
   void initState() {
     super.initState();
+    notifyHlper = NotifyHelper();
+    NotifyHelper().initializeNotification();
+    NotifyHelper().requestIOSPermissions();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: MyWidgets(
-        ontap: () {
-          ThemeService().switchTheme();
-          setState(() {});
-        },
-      ).appBar(),
+      appBar: appBar(),
       body: Column(
         children: [
-          MyWidgets(
-            addtask: () async {
-              await Get.to(const AddTasks());
-              _taskController.getTask();
-            },
-          ).addTaskBar(),
-          MyWidgets(
-            selectedDate: date,
-          ).addTimeBar(date),
+          addTaskBar(),
+          addTimeBar(selectedDate),
           const SizedBox(
             height: 10,
           ),
@@ -55,33 +54,78 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   _showTasks() {
-    return Expanded(child: Obx(() {
-      return ListView.builder(
-          itemCount: _taskController.taskList.length,
-          itemBuilder: (_, index) {
-            // ignore: avoid_print
-            print(_taskController.taskList.length);
-            return AnimationConfiguration.staggeredList(
-              position: index,
-              child: SlideAnimation(
-                  child: FadeInAnimation(
+    return Expanded(
+      child: Obx(
+        () {
+          return ListView.builder(
+            itemCount: _taskController.taskList.length,
+            itemBuilder: (_, index) {
+              Task task = _taskController.taskList[index];
+              if (task.repeat == 'Daily') {
+                print("StartTime:  ${task.startTime}\n");
+                DateTime cdate = DateTime.now();
+                print(" :$cdate\n");
+                DateTime date =
+                    DateFormat('hh:mm').parse(task.startTime.toString());
+                print("2nd Time :$date\n");
+                date = DateTime(
+                    cdate.year, cdate.month, cdate.day, date.hour, date.minute);
+                print("3rd Time :$date\n");
+                var mytime = DateFormat('hh:mm').format(date);
+                notifyHlper.scheduledNotification(
+                    int.parse(mytime.toString().split(":")[0]),
+                    int.parse(mytime.toString().split(":")[1]),
+                    task);
+                return AnimationConfiguration.staggeredList(
+                  position: index,
+                  child: SlideAnimation(
+                    child: FadeInAnimation(
                       child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      debugPrint('Tapped');
-                      _showBottomSheet(
-                          context, _taskController.taskList[index]);
-                    },
-                    child: TaskTile(
-                      task: _taskController.taskList[index],
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              debugPrint('Tapped');
+                              _showBottomSheet(context, task);
+                            },
+                            child: TaskTile(
+                              task: task,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  )
-                ],
-              ))),
-            );
-          });
-    }));
+                  ),
+                );
+              }
+              if (task.date == DateFormat.yMd().format(selectedDate)) {
+                return AnimationConfiguration.staggeredList(
+                  position: index,
+                  child: SlideAnimation(
+                    child: FadeInAnimation(
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              debugPrint('Tapped');
+                              _showBottomSheet(context, task);
+                            },
+                            child: TaskTile(
+                              task: task,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              } else {
+                return Container();
+              }
+            },
+          );
+        },
+      ),
+    );
   }
 
   _showBottomSheet(BuildContext context, Task task) {
@@ -172,6 +216,102 @@ class _HomeScreenState extends State<HomeScreen> {
               isClose ? titleStyle : titleStyle.copyWith(color: Colors.white),
         )),
       ),
+    );
+  }
+
+  addTimeBar(DateTime dateTime) {
+    return Container(
+      margin: const EdgeInsets.only(top: 20, left: 10),
+      child: DatePicker(
+        DateTime.now(),
+        height: 100,
+        width: 80,
+        initialSelectedDate: DateTime.now(),
+        selectionColor: primaryclr,
+        selectedTextColor: Colors.white,
+        dateTextStyle: GoogleFonts.lato(
+            textStyle: const TextStyle(
+                fontSize: 20, color: Colors.grey, fontWeight: FontWeight.w600)),
+        dayTextStyle: GoogleFonts.lato(
+            textStyle: const TextStyle(
+                fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w600)),
+        monthTextStyle: GoogleFonts.lato(
+            textStyle: const TextStyle(
+                fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w600)),
+        onDateChange: (date) {
+          setState(() {
+            selectedDate = date;
+          });
+        },
+      ),
+    );
+  }
+
+  addTaskBar() {
+    return Padding(
+      padding: const EdgeInsets.all(10.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                DateFormat.yMMMMd().format(DateTime.now()),
+                style: subHeadingStyle,
+              ),
+              Text('ToDay', style: headingStyle)
+            ],
+          ),
+          MyButton(
+            lable: "+ Add Task",
+            onTap: () async {
+              await Get.to(const AddTasks());
+              _taskController.getTask();
+            },
+          )
+        ],
+      ),
+    );
+  }
+
+  appBar() {
+    return AppBar(
+      title: const Text(
+        "TASK MANAGER",
+        style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+      ),
+      centerTitle: true,
+      leading: GestureDetector(
+        onTap: () {
+          setState(() {
+            ThemeService().switchTheme();
+          });
+          notifyHlper.displayNotification(
+            title: "Theme Changed",
+            body: Get.isDarkMode
+                ? "Activated Light Theme"
+                : "Activated Dark Theme",
+          );
+        },
+        child: Get.isDarkMode != false
+            ? Icon(
+                Icons.nightlight_round_outlined,
+                color: Get.isDarkMode ? Colors.black : Colors.white,
+              )
+            : Icon(
+                Icons.sunny,
+                color: Colors.grey[200],
+              ),
+      ),
+      actions: const [
+        CircleAvatar(
+          backgroundImage: AssetImage("images/a.jpg"),
+        ),
+        SizedBox(
+          width: 20,
+        )
+      ],
     );
   }
 }
